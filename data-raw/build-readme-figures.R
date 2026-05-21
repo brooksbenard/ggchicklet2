@@ -180,4 +180,32 @@ p_box_dodge <- ggplot(db2, aes(topic, elapsed, fill = debate_group)) +
 ggsave(file.path(fig_dir, "README-geom-chicklet-boxplot-dodged.png"),
        p_box_dodge, width = 9, height = 5.5, dpi = 110, bg = "white")
 
-message("Wrote 4 README figures to ", fig_dir, "/")
+# 5) geom_chicklet_histogram: stacked rounded histogram ---------------------
+
+hist_topics <- c("Healthcare", "Foreign Policy", "Immigration",
+                 "Gun Control", "Economy", "Climate")
+dh <- subset(debates2019, topic %in% hist_topics)
+dh$topic <- factor(dh$topic, levels = hist_topics)
+
+p_hist <- ggplot(dh, aes(elapsed, fill = topic)) +
+  geom_chicklet_histogram(
+    binwidth = 0.1,
+    colour   = "white",
+    radius   = grid::unit(2, "pt")
+  ) +
+  scale_fill_manual(values = palette_topics) +
+  scale_x_continuous(breaks = seq(0, 3, 0.5)) +
+  guides(fill = guide_legend(nrow = 1)) +
+  labs(
+    x = "Minutes per response", y = "Count",
+    title    = "geom_chicklet_histogram(): rounded histogram",
+    subtitle = "Distribution of response length, stacked by topic, across all 2019\u20132020 debates",
+    caption  = "Data: debates2019 (bundled with ggchicklet2)"
+  ) +
+  theme_chicklet() +
+  theme(panel.grid.major.y = element_line(colour = "grey92"))
+
+ggsave(file.path(fig_dir, "README-geom-chicklet-histogram.png"),
+       p_hist, width = 9, height = 5.5, dpi = 110, bg = "white")
+
+message("Wrote 5 README figures to ", fig_dir, "/")

@@ -8,6 +8,18 @@
   inheriting from `GeomBoxplot` and using `StatBoxplot` for stat
   computation, so it composes with `aes()`, scales, faceting,
   `position_dodge2()`, and horizontal orientation.
+* **New geom:** `geom_chicklet_histogram()` — a drop-in replacement for
+  `ggplot2::geom_histogram()` that renders each bar as a rounded
+  rectangle. Implemented as a proper `ggproto` (`GeomChickletHistogram`)
+  inheriting from `GeomBar` and using `StatBin` for stat computation,
+  so it supports faceting, horizontal orientation, and stack/dodge/
+  identity positions.
+* **New convenience wrapper:** `geom_chicklet_bar()` — the same geom
+  with `stat = "count"` for discrete `x`, mirroring
+  `ggplot2::geom_bar()`.
+* Pin `lineend` / `linejoin` to `"round"` in the rounded-box renderer
+  so the four corners no longer show mitre-join spikes (regression
+  introduced when forwarding `GeomBoxplot$draw_group()` defaults).
 * Bumped minimum `ggplot2` requirement to 3.5.0 (for the modern
   `*_gp` boxplot customization API and exported `flip_data()` /
   `fill_alpha()` helpers).

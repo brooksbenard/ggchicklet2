@@ -2,8 +2,11 @@
 
 export(GeomChicklet)
 export(GeomChickletBoxplot)
+export(GeomChickletHistogram)
 export(geom_chicklet)
+export(geom_chicklet_bar)
 export(geom_chicklet_boxplot)
+export(geom_chicklet_histogram)
 export(geom_rrect)
 import(ggplot2)
 importFrom(grid,gList)

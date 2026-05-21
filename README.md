@@ -17,6 +17,8 @@ charts to additional `ggplot2` geoms.
 | `geom_chicklet()` | Stacked rounded segmented column chart (the original) |
 | `geom_rrect()` | `geom_rect()` with rounded corners |
 | `geom_chicklet_boxplot()` | **New.** Drop-in rounded replacement for `ggplot2::geom_boxplot()` (real `ggproto`, inherits from `GeomBoxplot`, uses `StatBoxplot`) |
+| `geom_chicklet_histogram()` | **New.** Drop-in rounded replacement for `ggplot2::geom_histogram()` (real `ggproto`, inherits from `GeomBar`, uses `StatBin`) |
+| `geom_chicklet_bar()` | **New.** Same geom as above with `stat = "count"` for discrete `x` — a rounded `geom_bar()` |
 | `debates2019` | 2019–2020 U.S. Democratic Debate candidate × topic speaking times |
 
 More rounded variants (`geom_chicklet_violin()`, `geom_chicklet_tile()`,
@@ -148,6 +150,48 @@ ggplot(db2, aes(topic, elapsed, fill = debate_group)) +
 ```
 
 ![](man/figures/README-geom-chicklet-boxplot-dodged.png)
+
+### 5. `geom_chicklet_histogram()` — rounded histograms
+
+A drop-in replacement for `ggplot2::geom_histogram()` (and by extension
+`geom_bar()`) that renders each bar as a rounded rectangle. Implemented
+as a real `ggproto` (`GeomChickletHistogram`) inheriting from `GeomBar`
+and using `StatBin` for stat computation, so it supports the full
+bar/histogram aesthetic set, faceting, horizontal orientation
+(`orientation = "y"`), and stack/dodge/identity positions.
+
+```r
+featured <- c("Healthcare", "Foreign Policy", "Immigration",
+              "Gun Control", "Economy", "Climate")
+dh <- subset(debates2019, topic %in% featured)
+dh$topic <- factor(dh$topic, levels = featured)
+
+ggplot(dh, aes(elapsed, fill = topic)) +
+  geom_chicklet_histogram(
+    binwidth = 0.1,
+    colour   = "white",
+    radius   = grid::unit(2, "pt")
+  ) +
+  theme_minimal()
+```
+
+![](man/figures/README-geom-chicklet-histogram.png)
+
+For discrete `x` (count plots), use the convenience wrapper
+`geom_chicklet_bar()`, which is identical to `geom_chicklet_histogram()`
+but with `stat = "count"` instead of `"bin"`:
+
+```r
+ggplot(debates2019, aes(speaker)) +
+  geom_chicklet_bar(fill = "#436f82", radius = grid::unit(2, "pt")) +
+  coord_flip() +
+  theme_minimal()
+```
+
+> **Note:** all four corners of every bar are rounded. For typical
+> baseline-aligned histograms this lifts the bottom edges very slightly
+> off the x-axis; reduce `radius` (e.g. `grid::unit(1, "pt")`) if that
+> gap is visually distracting.
 
 ## Anywhere you currently use `geom_boxplot()`, you can drop in `geom_chicklet_boxplot()`
 
