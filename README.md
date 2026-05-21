@@ -1,129 +1,105 @@
 
-[![Project Status: Active – The project has reached a stable, usable
-state and is being actively
-developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
-[![Signed
-by](https://img.shields.io/badge/Keybase-Verified-brightgreen.svg)](https://keybase.io/hrbrmstr)
-![Signed commit
-%](https://img.shields.io/badge/Signed_Commits-100%25-lightgrey.svg)
-[![Linux build
-Status](https://travis-ci.org/hrbrmstr/ggchicklet.svg?branch=master)](https://travis-ci.org/hrbrmstr/ggchicklet)
-[![Coverage
-Status](https://codecov.io/gh/hrbrmstr/ggchicklet/branch/master/graph/badge.svg)](https://codecov.io/gh/hrbrmstr/ggchicklet)
-![Minimal R
-Version](https://img.shields.io/badge/R%3E%3D-3.2.0-blue.svg)
+[![R-CMD-check](https://github.com/brooksbenard/ggchicklet2/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/brooksbenard/ggchicklet2/actions/workflows/R-CMD-check.yaml)
+![Minimal R Version](https://img.shields.io/badge/R%3E%3D-3.5.0-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-# ggchicklet
+# ggchicklet2
 
-Create Chicklet (Rounded Segmented Column) Charts
+`ggchicklet2` is a friendly fork of Bob Rudis' excellent
+[`ggchicklet`](https://github.com/hrbrmstr/ggchicklet) package that extends
+rounded-rectangle ("chicklet") styling beyond stacked column charts to
+additional `ggplot2` geoms.
 
-## Description
+## What's in the tin
 
-Sometimes it is useful to stylize column charts a bit more than just
-bland rectangles. Methods are provided to create rounded rectangle
-segmented column charts (i.e. “chicklets”).
+In addition to everything carried over from upstream `ggchicklet`
+(`geom_chicklet()`, `geom_rrect()`, the `debates2019` dataset), this fork
+adds:
 
-## What’s Inside The Tin
+- `geom_chicklet_boxplot()` — a drop-in replacement for
+  `ggplot2::geom_boxplot()` whose box body is rendered as a rounded
+  rectangle. Implemented as a real `ggproto` (`GeomChickletBoxplot`)
+  inheriting from `GeomBoxplot` and using `StatBoxplot`, so it plays
+  nicely with `aes()`, scales, faceting, `position_dodge2()`, and
+  horizontal orientation.
 
-  - `debates2019`: 2019-2020 U.S. Democratic Debate Candidate/Topic
-    Times
-  - `geom_chicklet`: Chicklet (rounded segmented column) charts
-
-The following functions are implemented:
+More rounded variants (`geom_chicklet_violin()`, `geom_chicklet_tile()`,
+etc.) are on the roadmap.
 
 ## Installation
 
-``` r
-install.packages("ggchicklet", repos = "https://cinc.rud.is")
-# or
-remotes::install_git("https://git.rud.is/hrbrmstr/ggchicklet.git")
-# or
-remotes::install_git("https://git.sr.ht/~hrbrmstr/ggchicklet")
-# or
-remotes::install_gitlab("hrbrmstr/ggchicklet")
-# or
-remotes::install_bitbucket("hrbrmstr/ggchicklet")
-# or
-remotes::install_github("hrbrmstr/ggchicklet")
+```r
+remotes::install_github("brooksbenard/ggchicklet2")
 ```
 
-NOTE: To use the ‘remotes’ install options you will need to have the
-[{remotes} package](https://github.com/r-lib/remotes) installed.
+## Usage — `geom_chicklet_boxplot()`
 
-## Usage
+```r
+library(ggplot2)
+library(ggchicklet2)
 
-``` r
-library(ggchicklet)
+# Simple, single grouping
+ggplot(iris, aes(Species, Sepal.Length, fill = Species)) +
+  geom_chicklet_boxplot(radius = grid::unit(4, "pt"), staplewidth = 0.5) +
+  theme_minimal()
 
-# current version
-packageVersion("ggchicklet")
-## [1] '0.5.2'
+# Dodged: secondary grouping via fill
+mt <- transform(mtcars, cyl = factor(cyl), gear = factor(gear))
+ggplot(mt, aes(cyl, mpg, fill = gear)) +
+  geom_chicklet_boxplot(radius = grid::unit(3, "pt"),
+                        staplewidth = 0.5) +
+  theme_minimal()
+
+# Horizontal orientation works out of the box
+ggplot(iris, aes(Sepal.Length, Species, fill = Species)) +
+  geom_chicklet_boxplot() +
+  theme_minimal()
 ```
 
-### From the NYTimes
+Because `geom_chicklet_boxplot()` mirrors the modern `ggplot2::geom_boxplot()`
+signature, anywhere you currently write `geom_boxplot(...)` you can write
+`geom_chicklet_boxplot(...)` (notched boxplots are the only exception:
+`notch = TRUE` is silently ignored because notches are incompatible with
+rounded corners).
 
-``` r
+## Usage — `geom_chicklet()` (carried over from upstream)
+
+```r
 library(hrbrthemes)
 library(tidyverse)
 
 data("debates2019")
 
 debates2019 %>%
-  filter(debate_group == 1) %>% 
-  mutate(speaker = fct_reorder(speaker, elapsed, sum, .desc=FALSE)) %>%
+  filter(debate_group == 1) %>%
+  mutate(speaker = fct_reorder(speaker, elapsed, sum, .desc = FALSE)) %>%
   mutate(topic = fct_other(
     topic,
-    c("Immigration", "Economy", "Climate Change", "Gun Control", "Healthcare", "Foreign Policy"))
+    c("Immigration", "Economy", "Climate Change",
+      "Gun Control", "Healthcare", "Foreign Policy"))
   ) %>%
   ggplot(aes(speaker, elapsed, group = timestamp, fill = topic)) +
   geom_chicklet(width = 0.75) +
-  scale_y_continuous(
-    expand = c(0, 0.0625),
-    position = "right",
-    breaks = seq(0, 14, 2),
-    labels = c(0, sprintf("%d min.", seq(2, 14, 2)))
-  ) +
-  scale_fill_manual(
-    name = NULL,
-    values = c(
-      "Immigration" = "#ae4544",
-      "Economy" = "#d8cb98",
-      "Climate Change" = "#a4ad6f",
-      "Gun Control" = "#cc7c3a",
-      "Healthcare" = "#436f82",
-      "Foreign Policy" = "#7c5981",
-      "Other" = "#cccccc"
-    ),
-    breaks = setdiff(unique(debates2019$topic), "Other")
-  ) +
-  guides(
-    fill = guide_legend(nrow = 1)
-  ) +
   coord_flip() +
-  labs(
-    x = NULL, y = NULL, fill = NULL,
-    title = "How Long Each Candidate Spoke",
-    subtitle = "Nights 1 & 2 of the June 2019 Democratic Debates",
-    caption = "Each bar segment represents the length of a candidate’s response to a question.\n\nOriginals <https://www.nytimes.com/interactive/2019/admin/100000006581096.embedded.html?>\n<https://www.nytimes.com/interactive/2019/admin/100000006584572.embedded.html?>\nby @nytimes Weiyi Cai, Jason Kao, Jasmine C. Lee, Alicia Parlapiano and Jugal K. Patel\n\n#rstats reproduction by @hrbrmstr"
-  ) +
-  theme_ipsum_rc(grid="X") +
-  theme(axis.text.x = element_text(color = "gray60", size = 10)) +
+  theme_ipsum_rc(grid = "X") +
   theme(legend.position = "top")
 ```
 
-<img src="man/figures/README-nyt-1.png" width="100%" />
+## Relationship to upstream `ggchicklet`
 
-## ggchicklet Metrics
+This is a *renamed* fork (not just a branch). The original `ggchicklet`
+package is unchanged and continues to be available from
+[git.rud.is](https://git.rud.is/hrbrmstr/ggchicklet) and from
+[hrbrmstr/ggchicklet](https://github.com/hrbrmstr/ggchicklet) on GitHub.
+`ggchicklet2` is intended for users who want the extended geom set and
+modernized infrastructure (newer `ggplot2` baseline, GitHub Actions CI).
 
-| Lang | \# Files |  (%) |   LoC |  (%) | Blank lines |  (%) | \# Lines |  (%) |
-| :--- | -------: | ---: | ----: | ---: | ----------: | ---: | -------: | ---: |
-| HTML |       12 | 0.55 | 10200 | 0.92 |        3169 | 0.97 |      501 | 0.71 |
-| R    |        8 | 0.36 |   788 | 0.07 |          45 | 0.01 |      122 | 0.17 |
-| Rmd  |        2 | 0.09 |   117 | 0.01 |          45 | 0.01 |       85 | 0.12 |
+All original code, copyrights, and the MIT license from upstream are
+preserved; Bob Rudis is credited as an author/copyright holder in
+`DESCRIPTION` per `Authors@R`.
 
 ## Code of Conduct
 
-Please note that this project is released with a [Contributor Code of
-Conduct](CONDUCT.md). By participating in this project you agree to
-abide by its terms.
+Please note that this project is released with a
+[Contributor Code of Conduct](CONDUCT.md). By participating in this project
+you agree to abide by its terms.

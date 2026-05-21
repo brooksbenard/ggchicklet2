@@ -1,10 +1,10 @@
 ---
-title: "Using {ggchicklet}"
+title: "Using {ggchicklet2}"
 output: 
   rmarkdown::html_vignette:
     df_print: kable
 vignette: >
-  %\VignetteIndexEntry{Using {ggchicklet}}
+  %\VignetteIndexEntry{Using {ggchicklet2}}
   %\VignetteEncoding{UTF-8}
   %\VignetteEngine{knitr::rmarkdown}
 editor_options: 
@@ -18,29 +18,37 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "## "
 )
+
+has_hrbrthemes <- requireNamespace("hrbrthemes", quietly = TRUE)
+has_dplyr      <- requireNamespace("dplyr",      quietly = TRUE)
+has_forcats    <- requireNamespace("forcats",    quietly = TRUE)
 ```
 
 The New York Times reporters [kept track of the candiate speaking time spent per-topic](https://www.nytimes.com/interactive/2019/admin/100000006581096.embedded.html) for the June 2019 initial U.S. Democratic debates. They used a segmented, rounded-corner bar chart --- ordered by timestamp --- that I've dubbed a "chicklet" chart since they look like the fairly well-known gum/candy. This is the image from one of them:
 
 ![](nytimes.png)
 
-The rounded corners aesthetic looked great and said feature begat the creation of {ggchicklet}.
+The rounded corners aesthetic looked great and said feature begat the creation of {ggchicklet}. {ggchicklet2} is a friendly fork that carries that aesthetic forward to additional geoms (see also `geom_chicklet_boxplot()`).
 
 Let's load up the packages we'll need:
 
-```{r setup}
-library(hrbrthemes) # my preferred theme
-library(ggchicklet) # this pacakge!
-library(dplyr) # we need to do a bit of data wrangling
-library(forcats) # so we include {dplyr} and {forcats}
-library(ggplot2) # duh!
+```{r setup, eval = has_hrbrthemes && has_dplyr && has_forcats}
+library(hrbrthemes)  # preferred theme
+library(ggchicklet2) # this package!
+library(dplyr)       # data wrangling
+library(forcats)     # factor wrangling
+library(ggplot2)
+```
+
+```{r setup-fallback, eval = !(has_hrbrthemes && has_dplyr && has_forcats), echo = FALSE, results = "asis"}
+cat("> *Suggested packages (`hrbrthemes`, `dplyr`, `forcats`) are not installed; the remaining code chunks in this vignette are skipped. Install them to see the rendered example.*\n")
 ```
 
 If you peek at the source code for the New York Times javascript-created charts you'll see 
 that all the data is right there. Rather than make you figure out how to wrangle it, a majority
 subset has been included in the package and can be accessed via:
 
-```{r data}
+```{r data, eval = has_hrbrthemes && has_dplyr && has_forcats}
 data("debates2019")
 
 head(debates2019, 10)
@@ -50,7 +58,7 @@ The `elapsed` column contains how long the candidate spoke and `timestamp` is th
 
 There are also candidates:
 
-```{r data-ex-01}
+```{r data-ex-01, eval = has_hrbrthemes && has_dplyr && has_forcats}
 debates2019 %>% 
   filter(debate_group == 1) %>% 
   filter(night == 1) %>% 
@@ -61,7 +69,7 @@ debates2019 %>%
 
 and the topics debates:
 
-```{r data-ex-02}
+```{r data-ex-02, eval = has_hrbrthemes && has_dplyr && has_forcats}
 debates2019 %>% 
   filter(debate_group == 1) %>% 
   filter(night == 1) %>% 
@@ -80,7 +88,7 @@ We need to use `group = timestamp` to ensure the segments are ordered by time (v
 and `fill = topic` to color them appropriately. Note that just using `fill = topic` would group 
 the segments by topic.
 
-```{r chicklet, fig.width=600/72, fig.height=600/72}
+```{r chicklet, fig.width=600/72, fig.height=600/72, eval = has_hrbrthemes && has_dplyr && has_forcats}
 debates2019 %>%
   filter(debate_group == 1) %>% 
   mutate(speaker = fct_reorder(speaker, elapsed, sum, .desc=FALSE)) %>%

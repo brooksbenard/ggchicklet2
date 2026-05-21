@@ -2,7 +2,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.travis\.yml$
-^README\.*Rmd$
+^\.github$
 ^README\.*html$
 ^NOTES\.*Rmd$
 ^NOTES\.*html$

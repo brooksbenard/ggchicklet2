@@ -1,0 +1,117 @@
+---
+title: "Chicklet boxplots with {ggchicklet2}"
+output:
+  rmarkdown::html_vignette:
+    df_print: kable
+vignette: >
+  %\VignetteIndexEntry{Chicklet boxplots with {ggchicklet2}}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options:
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  collapse = TRUE,
+  comment = "## ",
+  fig.width = 6,
+  fig.height = 4,
+  out.width = "100%"
+)
+```
+
+`geom_chicklet_boxplot()` is a drop-in replacement for
+`ggplot2::geom_boxplot()` whose box body is rendered as a rounded
+rectangle. It is implemented as a real `ggproto` (`GeomChickletBoxplot`)
+that inherits from `GeomBoxplot` and uses `StatBoxplot` for stat
+computation, so:
+
+- it supports the full boxplot aesthetic set (`x`/`y`, `lower`, `upper`,
+  `middle`, `ymin`, `ymax`, `fill`, `colour`, `linewidth`, `linetype`,
+  `alpha`, `weight`);
+- it understands `orientation = "x"`/`"y"` and `coord_flip()`;
+- it dodges correctly when you map a secondary aesthetic such as `fill`
+  to a second variable; and
+- it accepts the modern boxplot customization arguments (`outlier.*`,
+  `whisker.*`, `staple.*`, `median.*`, `box.*`, plus the `*_gp` lists)
+  that ggplot2 ≥ 3.5.0 exposes.
+
+```{r setup}
+library(ggplot2)
+library(ggchicklet2)
+```
+
+## Single grouping
+
+```{r single-group}
+ggplot(iris, aes(Species, Sepal.Length, fill = Species)) +
+  geom_chicklet_boxplot(
+    radius      = grid::unit(4, "pt"),
+    staplewidth = 0.5
+  ) +
+  theme_minimal()
+```
+
+## Dodged: secondary grouping via `fill`
+
+This is the case where the original list-of-layers prototype broke down —
+because the inner `dodge` was based only on the x variable. The real
+`ggproto` version picks up the `fill` grouping automatically.
+
+```{r dodged}
+mt <- transform(mtcars,
+                cyl  = factor(cyl),
+                gear = factor(gear))
+
+ggplot(mt, aes(cyl, mpg, fill = gear)) +
+  geom_chicklet_boxplot(
+    radius      = grid::unit(3, "pt"),
+    staplewidth = 0.5
+  ) +
+  theme_minimal()
+```
+
+## Horizontal orientation
+
+Just swap the aesthetics — the underlying `flipped_aes` machinery is
+inherited from `GeomBoxplot`.
+
+```{r horizontal}
+ggplot(iris, aes(Sepal.Length, Species, fill = Species)) +
+  geom_chicklet_boxplot(radius = grid::unit(6, "pt")) +
+  theme_minimal()
+```
+
+## Pairs nicely with `ggsignif`
+
+Because `geom_chicklet_boxplot()` is a proper geom whose layer data
+includes the full set of boxplot summary columns, downstream packages
+that introspect ggplot layer data (such as `ggsignif`, `ggpubr`,
+`ggrepel`) work without modification:
+
+```{r ggsignif, eval = requireNamespace("ggsignif", quietly = TRUE)}
+library(ggsignif)
+
+ggplot(iris, aes(Species, Sepal.Length, fill = Species)) +
+  geom_chicklet_boxplot(radius = grid::unit(4, "pt"),
+                        staplewidth = 0.5) +
+  geom_signif(
+    comparisons = list(c("setosa", "versicolor"),
+                       c("versicolor", "virginica")),
+    map_signif_level = TRUE,
+    step_increase = 0.08
+  ) +
+  theme_minimal()
+```
+
+## Caveats
+
+- `notch = TRUE` is intentionally unsupported; rounded corners and notch
+  geometry are incompatible. The argument is accepted for signature
+  compatibility but is silently ignored (and a warning is emitted if you
+  set it explicitly).
+- The legend key is currently inherited from `GeomBoxplot` rather than
+  being a rounded mini-boxplot. This is a known cosmetic limitation.

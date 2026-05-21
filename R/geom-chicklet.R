@@ -33,6 +33,8 @@
 #' @inheritParams ggplot2::layer
 #' @inheritParams ggplot2::geom_point
 #' @inheritParams ggplot2::geom_col
+#' @param width bar width. If `NULL` (the default), uses 90% of the
+#'   resolution of the x-axis (same convention as [ggplot2::geom_col()]).
 #' @param radius corner radius (default 3pt)
 #' @note the chicklet/segment stack positions are default set to be reversed (i.e.
 #'       left-to-right/bottom-to-top == earliest to latest order).

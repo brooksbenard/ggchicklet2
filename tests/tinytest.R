@@ -1,5 +1,3 @@
-
-if ( requireNamespace("tinytest", quietly=TRUE) ){
-  tinytest::test_package("ggchicklet")
+if (requireNamespace("tinytest", quietly = TRUE)) {
+  tinytest::test_package("ggchicklet2")
 }
-
