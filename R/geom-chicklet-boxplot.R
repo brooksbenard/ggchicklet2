@@ -269,7 +269,7 @@ GeomChickletBoxplot <- ggplot2::ggproto( # nocov start
     box <- ggplot2::flip_data(box, flipped_aes)
     box_grob <- draw_chicklet_box(
       box, panel_params, coord,
-      radius = radius, lineend = lineend, linejoin = linejoin
+      radius = radius
     )
 
     # ── Median line ─────────────────────────────────────────────────────
@@ -304,10 +304,17 @@ GeomChickletBoxplot <- ggplot2::ggproto( # nocov start
 # Internal helper: render a (set of) rounded rectangles for box bodies.
 # Mirrors the rendering used by GeomRrect / GeomChicklet so that boxplot
 # fill / colour / alpha / linewidth all behave the same way.
+#
+# Note: `lineend` and `linejoin` are intentionally pinned to "round" here.
+# `grid::roundrectGrob()` builds its border from arc + straight-segment
+# sub-paths; with the boxplot defaults (`linejoin = "mitre"`,
+# `lineend = "butt"`) the mitre joins at each arc-to-edge seam produce
+# small visible spikes at the four corners. Using "round" for both
+# eliminates the spikes and matches what upstream GeomChicklet/GeomRrect
+# get from `gpar()`'s defaults.
 draw_chicklet_box <- function(data, panel_params, coord,
-                              radius   = grid::unit(3, "pt"),
-                              lineend  = "butt",
-                              linejoin = "mitre") {
+                              radius = grid::unit(3, "pt"),
+                              ...) {
 
   coords <- coord$transform(data, panel_params)
 
@@ -325,8 +332,8 @@ draw_chicklet_box <- function(data, panel_params, coord,
         fill     = ggplot2::fill_alpha(coords$fill[i], coords$alpha[i]),
         lwd      = (coords$linewidth[i] %||% 0.5) * .pt,
         lty      = coords$linetype[i],
-        lineend  = lineend,
-        linejoin = linejoin
+        lineend  = "round",
+        linejoin = "round"
       )
     )
   })
