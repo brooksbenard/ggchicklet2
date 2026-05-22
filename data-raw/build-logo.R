@@ -5,13 +5,14 @@
 # committed at data-raw/logo-source.png so the build is reproducible
 # from a clone of the repo. Output goes to man/figures/logo.png.
 #
-# `s_width = s_height = 2.15` fills the hex without spilling the
-# artwork past the gold rim; at that size the artwork's own white
-# background does fill the four canvas-corner triangles outside the
-# rim though, so we follow up with a {magick} flood-fill from each
-# corner region to clear the spillage back to transparent. The
-# gold rim is a closed boundary so the flood stops at the rim and
-# the white inside the hex is untouched.
+# `s_width = s_height = 2.35` with `s_y = 0.95` is the framing the
+# maintainer settled on -- the artwork fills the hex without crossing
+# the gold rim. At that size the artwork's own white background does
+# fill the four canvas-corner triangles outside the rim though, so we
+# follow up with a {magick} flood-fill from each corner region to
+# clear the spillage back to transparent. The gold rim is a closed
+# boundary so the flood stops at the rim and the white inside the hex
+# is untouched.
 #
 # Reference: https://github.com/GuangchuangYu/hexSticker
 #
@@ -22,7 +23,7 @@ library(hexSticker)
 hex_logo <- magick::image_read("data-raw/logo-source.png")
 
 sticker(hex_logo, package = "",
-        s_x = 1, s_y = 1, s_width = 2.15, s_height = 2.15,
+        s_x = 1, s_y = .95, s_width = 2.35, s_height = 2.35,
         h_color = "#C09F56", h_fill = "white",
         filename = "man/figures/logo.png")
 
