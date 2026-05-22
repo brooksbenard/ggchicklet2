@@ -4,12 +4,14 @@
 # Pipeline (using the {magick} R package, which wraps libMagickWand
 # directly so we avoid shell-quoting issues with %h, parens, etc.):
 #
-#   1. Trim the off-white "card" border that surrounds the hex artwork.
-#   2. Crop the result to a point-top hex aspect ratio (W:H = 1 : 2/sqrt(3)),
-#      centering the existing hex.
+#   1. Trim the white margin around the source artwork.
+#   2. Pad to a point-top hex aspect ratio (W:H = 1 : 2/sqrt(3)) with a
+#      white background, centering the existing artwork.
 #   3. Apply a polygon alpha mask in the shape of a point-top hexagon
-#      so the four corners outside the gold border become transparent.
-#   4. Resize to 600px wide and write to man/figures/logo.png.
+#      so the four corners outside the hex shape become transparent.
+#   4. Stroke the hex outline in the brand-gold colour `border_color`
+#      so the sticker has a visible coloured rim.
+#   5. Resize to 600px wide and write to man/figures/logo.png.
 #
 # Usage:  Rscript data-raw/build-logo.R
 
@@ -20,54 +22,80 @@ if (!requireNamespace("magick", quietly = TRUE)) {
 src <- "data-raw/logo-source.png"
 dst <- "man/figures/logo.png"
 
+# Brand-gold border colour, sampled from the swatch supplied by the user.
+border_color <- "#C09F56"
+# Stroke width in *source-pixel* units, before the final resize. The image
+# will be downsampled ~38% (~990 -> 600 wide) so a 12 px stroke ends up
+# rendering at roughly 7 px on the final logo.
+border_width <- 12
+
 if (!file.exists(src)) {
   stop("Missing source artwork: ", src)
 }
 
-# 1) Read + trim grey background to the white card containing the hex artwork.
+# 1) Read + trim white background.
 img <- magick::image_read(src)
-img <- magick::image_trim(img, fuzz = 8)
+img <- magick::image_trim(img, fuzz = 4)
 
-# 2) Crop to point-top hex aspect (W : H = 1 : 2/sqrt(3)).
+# 2) Pad to point-top hex aspect (W : H = 1 : 2/sqrt(3)) with white.
+info <- magick::image_info(img)
+w_src <- info$width
+h_target <- round(w_src * 2 / sqrt(3))
+if (info$height < h_target) {
+  img <- magick::image_extent(
+    img,
+    geometry = sprintf("%dx%d", w_src, h_target),
+    gravity  = "center",
+    color    = "white"
+  )
+} else {
+  # Source already taller than hex aspect; crop sides to match.
+  w_target <- round(info$height * sqrt(3) / 2)
+  img <- magick::image_crop(
+    img,
+    geometry = sprintf("%dx%d+0+0", w_target, info$height),
+    gravity  = "center"
+  )
+}
+
 info <- magick::image_info(img)
 w <- info$width
-h <- round(w * 2 / sqrt(3))
-img <- magick::image_crop(
-  img,
-  geometry = sprintf("%dx%d+0+0", w, h),
-  gravity  = "center"
-)
+h <- info$height
 
-# 3) Build a point-top hex polygon mask (white on transparent) and use it
-#    to mask the artwork's alpha channel.
-poly <- sprintf(
-  "%d,0 %d,%d %d,%d %d,%d 0,%d 0,%d",
-  w %/% 2L,                  # top
-  w,        h %/% 4L,        # upper-right
-  w,        (3L * h) %/% 4L, # lower-right
-  w %/% 2L, h,               # bottom
-  (3L * h) %/% 4L,           # lower-left  (y of)
-  h %/% 4L                   # upper-left  (y of)
-)
+# Point-top hex polygon vertices for a W x H bounding box.
+hex_x <- c(w / 2, w,     w,         w / 2, 0,         0)
+hex_y <- c(0,     h / 4, 3 * h / 4, h,     3 * h / 4, h / 4)
 
+# 3) Alpha mask: white-filled hex on transparent background, then
+#    composite via CopyOpacity to clip the corners.
 mask <- magick::image_blank(width = w, height = h, color = "transparent")
-mask <- magick::image_draw(mask)
-graphics::polygon(
-  x = c(w / 2,  w,           w,             w / 2,  0,             0),
-  y = c(0,      h / 4,       3 * h / 4,     h,      3 * h / 4,     h / 4),
-  col    = "white",
-  border = NA
-)
+mask <- magick::image_draw(mask, antialias = TRUE)
+graphics::polygon(hex_x, hex_y, col = "white", border = NA)
 grDevices::dev.off()
 
 img <- magick::image_composite(img, mask, operator = "CopyOpacity")
 
-# 4) Resize and write final logo.
+# 4) Gold hex border: stroke the same polygon, no fill, on a transparent
+#    layer, then composite over the masked artwork.
+border_layer <- magick::image_blank(width = w, height = h, color = "transparent")
+border_layer <- magick::image_draw(border_layer, antialias = TRUE)
+graphics::polygon(
+  hex_x, hex_y,
+  col    = NA,
+  border = border_color,
+  lwd    = border_width,
+  ljoin  = 1   # rounded corners on the stroke joins
+)
+grDevices::dev.off()
+
+img <- magick::image_composite(img, border_layer, operator = "Over")
+
+# 5) Resize and write.
 img <- magick::image_resize(img, "600x")
 
 dir.create(dirname(dst), recursive = TRUE, showWarnings = FALSE)
 magick::image_write(img, dst, format = "png", quality = 95)
 
-message("Wrote ", dst, " (",
-        magick::image_info(img)$width, "x",
-        magick::image_info(img)$height, ")")
+final <- magick::image_info(img)
+message("Wrote ", dst, " (", final$width, "x", final$height,
+        ", border = ", border_color, ")")
