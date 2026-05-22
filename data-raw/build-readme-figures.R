@@ -32,7 +32,6 @@ palette_topics <- c(
   "Immigration"     = "#ae4544",
   "Economy"         = "#d8cb98",
   "Climate"         = "#a4ad6f",
-  "Climate Change"  = "#a4ad6f",
   "Gun Control"     = "#cc7c3a",
   "Healthcare"      = "#436f82",
   "Foreign Policy"  = "#7c5981",
@@ -40,6 +39,11 @@ palette_topics <- c(
   "Education"       = "#b07ba0",
   "Other"           = "#cccccc"
 )
+
+# Helper: order a character/factor x by ascending median of y (NA-safe).
+order_by_median <- function(x, y) {
+  reorder(factor(x), y, FUN = function(v) median(v, na.rm = TRUE))
+}
 
 # 1) geom_chicklet: classic NYT-style stacked rounded bars --------------------
 
@@ -50,7 +54,10 @@ spk_order <- aggregate(elapsed ~ speaker, data = d1, sum)
 spk_order <- spk_order[order(spk_order$elapsed), ]
 d1$speaker <- factor(d1$speaker, levels = spk_order$speaker)
 
-featured_topics <- c("Immigration", "Economy", "Climate Change",
+# NOTE: the bundled data uses "Climate" (not "Climate Change"); using the
+# wrong label here previously caused every Climate response to be lumped
+# into "Other" and the green never appeared.
+featured_topics <- c("Immigration", "Economy", "Climate",
                      "Gun Control", "Healthcare", "Foreign Policy")
 d1$topic <- ifelse(d1$topic %in% featured_topics, d1$topic, "Other")
 d1$topic <- factor(d1$topic, levels = c(featured_topics, "Other"))
@@ -123,11 +130,13 @@ ggsave(file.path(fig_dir, "README-geom-rrect.png"),
        p_rrect, width = 9, height = 5.5, dpi = 110, bg = "white")
 
 # 3) geom_chicklet_boxplot: distribution of response length per topic --------
+#    Order topics on the x-axis by ascending median response length.
 
 box_topics <- c("Healthcare", "Foreign Policy", "Immigration", "Gun Control",
                 "Economy", "Climate", "Civil Rights", "Education")
 db <- subset(debates2019, topic %in% box_topics)
-db$topic <- factor(db$topic, levels = box_topics)
+db$topic <- order_by_median(db$topic, db$elapsed)
+topic_order <- levels(db$topic)  # capture for the dodged plot below
 
 p_box <- ggplot(db, aes(topic, elapsed, fill = topic)) +
   geom_chicklet_boxplot(
@@ -139,7 +148,7 @@ p_box <- ggplot(db, aes(topic, elapsed, fill = topic)) +
   labs(
     x = NULL, y = "Minutes per response",
     title    = "geom_chicklet_boxplot(): rounded boxplots",
-    subtitle = "Distribution of response length per topic across all 2019\u20132020 debates",
+    subtitle = "Distribution of response length per topic (ordered by ascending median) across all 2019\u20132020 debates",
     caption  = "Data: debates2019 (bundled with ggchicklet2)"
   ) +
   theme_chicklet() +
@@ -149,9 +158,11 @@ ggsave(file.path(fig_dir, "README-geom-chicklet-boxplot.png"),
        p_box, width = 9, height = 5.5, dpi = 110, bg = "white")
 
 # 4) geom_chicklet_boxplot dodged: topic x debate group -----------------------
+#    Same x-axis ordering as the single-grouping plot above so the two
+#    READMEs read coherently next to each other.
 
 db2 <- subset(debates2019, topic %in% box_topics)
-db2$topic        <- factor(db2$topic, levels = box_topics)
+db2$topic        <- factor(db2$topic, levels = topic_order)
 db2$debate_group <- factor(paste0("Debate ", db2$debate_group),
                            levels = paste0("Debate ", sort(unique(debates2019$debate_group))))
 db2 <- subset(db2, debate_group %in% c("Debate 1", "Debate 4", "Debate 7"))
@@ -171,7 +182,7 @@ p_box_dodge <- ggplot(db2, aes(topic, elapsed, fill = debate_group)) +
   labs(
     x = NULL, y = "Minutes per response",
     title    = "geom_chicklet_boxplot(): dodged by a second factor",
-    subtitle = "Same data, split by debate (1, 4, 7) \u2014 dodging is handled by position_dodge2()",
+    subtitle = "Same data, split by debate (1, 4, 7), topics ordered by overall ascending median",
     caption  = "Data: debates2019 (bundled with ggchicklet2)"
   ) +
   theme_chicklet() +
@@ -181,11 +192,13 @@ ggsave(file.path(fig_dir, "README-geom-chicklet-boxplot-dodged.png"),
        p_box_dodge, width = 9, height = 5.5, dpi = 110, bg = "white")
 
 # 5) geom_chicklet_histogram: stacked rounded histogram ---------------------
+#    Stack order (and legend order) follow the same ascending-median
+#    convention used by the boxplots.
 
 hist_topics <- c("Healthcare", "Foreign Policy", "Immigration",
                  "Gun Control", "Economy", "Climate")
 dh <- subset(debates2019, topic %in% hist_topics)
-dh$topic <- factor(dh$topic, levels = hist_topics)
+dh$topic <- order_by_median(dh$topic, dh$elapsed)
 
 p_hist <- ggplot(dh, aes(elapsed, fill = topic)) +
   geom_chicklet_histogram(

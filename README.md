@@ -53,7 +53,7 @@ d1 <- subset(debates2019, debate_group == 1)
 spk_order <- aggregate(elapsed ~ speaker, data = d1, sum)
 d1$speaker <- factor(d1$speaker,
                      levels = spk_order$speaker[order(spk_order$elapsed)])
-featured <- c("Immigration", "Economy", "Climate Change",
+featured <- c("Immigration", "Economy", "Climate",
               "Gun Control", "Healthcare", "Foreign Policy")
 d1$topic <- factor(ifelse(d1$topic %in% featured, d1$topic, "Other"),
                    levels = c(featured, "Other"))
@@ -114,7 +114,8 @@ computation), so it composes with `aes()`, scales, faceting,
 box_topics <- c("Healthcare", "Foreign Policy", "Immigration", "Gun Control",
                 "Economy", "Climate", "Civil Rights", "Education")
 db <- subset(debates2019, topic %in% box_topics)
-db$topic <- factor(db$topic, levels = box_topics)
+# Order topics on the x-axis by ascending median response length
+db$topic <- reorder(factor(db$topic), db$elapsed, median, na.rm = TRUE)
 
 ggplot(db, aes(topic, elapsed, fill = topic)) +
   geom_chicklet_boxplot(
@@ -137,7 +138,8 @@ grouping aesthetic automatically.
 ```r
 db2 <- subset(debates2019,
               topic %in% box_topics & debate_group %in% c(1, 4, 7))
-db2$topic        <- factor(db2$topic, levels = box_topics)
+# Use the same overall-median ordering as the single-grouping plot
+db2$topic        <- factor(db2$topic, levels = levels(db$topic))
 db2$debate_group <- factor(paste0("Debate ", db2$debate_group))
 
 ggplot(db2, aes(topic, elapsed, fill = debate_group)) +
@@ -164,7 +166,8 @@ bar/histogram aesthetic set, faceting, horizontal orientation
 featured <- c("Healthcare", "Foreign Policy", "Immigration",
               "Gun Control", "Economy", "Climate")
 dh <- subset(debates2019, topic %in% featured)
-dh$topic <- factor(dh$topic, levels = featured)
+# Stack and legend order: ascending median response length
+dh$topic <- reorder(factor(dh$topic), dh$elapsed, median, na.rm = TRUE)
 
 ggplot(dh, aes(elapsed, fill = topic)) +
   geom_chicklet_histogram(
