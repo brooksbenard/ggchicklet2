@@ -1,9 +1,9 @@
 
+# ggchicklet2 <img src="man/figures/logo.png" align="right" height="139" alt="ggchicklet2 hex logo" />
+
 [![R-CMD-check](https://github.com/brooksbenard/ggchicklet2/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/brooksbenard/ggchicklet2/actions/workflows/R-CMD-check.yaml)
 ![Minimal R Version](https://img.shields.io/badge/R%3E%3D-3.5.0-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
-
-# ggchicklet2
 
 `ggchicklet2` is a friendly fork of Bob Rudis' excellent
 [`ggchicklet`](https://github.com/hrbrmstr/ggchicklet) package that
