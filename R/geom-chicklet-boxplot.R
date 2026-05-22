@@ -298,7 +298,7 @@ GeomChickletBoxplot <- ggplot2::ggproto( # nocov start
     )
   },
 
-  draw_key = ggplot2::draw_key_boxplot
+  draw_key = draw_key_rrect
 ) # nocov end
 
 # Internal helper: render a (set of) rounded rectangles for box bodies.

@@ -73,20 +73,6 @@ geom_chicklet <- function(mapping = NULL, data = NULL,
   )
 }
 
-draw_key_rrect <- function(data, params, size) { # nocov start
-  grid::roundrectGrob(
-    r = min(params$radius, unit(3, "pt")),
-    default.units = "native",
-    width = 1, height = 0.6,
-    name = "lkey",
-    gp = grid::gpar(
-      col = params$color %l0% "white",
-      fill = alpha(data$fill %||% data$colour %||% "grey20", data$alpha),
-      lty = data$linetype %||% 1
-    )
-  )
-} # nocov end
-
 #' @rdname geom_chicklet
 #' @export
 GeomChicklet <- ggproto( # nocov start

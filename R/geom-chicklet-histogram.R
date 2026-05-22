@@ -176,5 +176,5 @@ GeomChickletHistogram <- ggplot2::ggproto( # nocov start
     ggname("geom_chicklet_histogram", grid::grobTree(children = box_grob))
   },
 
-  draw_key = ggplot2::draw_key_polygon
+  draw_key = draw_key_rrect
 ) # nocov end
