@@ -1,55 +1,63 @@
 #!/usr/bin/env Rscript
-# Builds man/figures/logo.png from data-raw/logo-source.png.
+# Builds man/figures/logo.png from data-raw/logo-source.png using
+# hexSticker::sticker() (https://github.com/GuangchuangYu/hexSticker)
+# to draw the brand-gold hex border.
 #
-# Pipeline (using the {magick} R package, which wraps libMagickWand
-# directly so we avoid shell-quoting issues with %h, parens, etc.):
+# `sticker()` renders its subplot as a flat rectangle, so it does not
+# clip the artwork to the hex shape on its own. To get clean transparent
+# corners we first pre-shape the artwork ourselves with {magick}:
 #
-#   1. Trim the white margin around the source artwork.
-#   2. Pad to a point-top hex aspect ratio (W:H = 1 : 2/sqrt(3)) with a
-#      white background, centering the existing artwork.
-#   3. Apply a polygon alpha mask in the shape of a point-top hexagon
-#      so the four corners outside the hex shape become transparent.
-#   4. Stroke the hex outline in the brand-gold colour `border_color`
-#      so the sticker has a visible coloured rim.
-#   5. Resize to 600px wide and write to man/figures/logo.png.
+#   1. Trim the white margin around the source PNG.
+#   2. Pad to a point-top hex aspect ratio (W : H = 1 : 2/sqrt(3)) on
+#      white, so the artwork sits centred inside the eventual hex.
+#   3. Punch out the four corners with a hex polygon alpha mask, so
+#      everything outside the hex outline is transparent.
+#
+# Then we hand that hex-shaped PNG to `hexSticker::sticker()` with:
+#   - `package = ""` + `p_size = 0` to suppress the auto-rendered
+#     package label (the artwork already says "ggchicklet2").
+#   - `s_width = 0.85`, tuned empirically (ggimage::geom_image()'s `size`
+#     is npc-relative and non-linear), so the hex-shaped artwork sits
+#     flush against the inside of the gold rim.
+#   - `h_color = "#C09F56"` to stroke the border in the brand-gold
+#     colour the user supplied. `h_fill = "white"` paints the hex
+#     interior to match the artwork's own background, hiding the seam
+#     where the trim ends.
 #
 # Usage:  Rscript data-raw/build-logo.R
 
-if (!requireNamespace("magick", quietly = TRUE)) {
-  stop("Install the {magick} R package: install.packages('magick')")
+req <- c("magick", "hexSticker", "ggimage", "showtext")
+missing <- req[!vapply(req, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing)) {
+  stop("Install missing packages: ",
+       paste(sprintf("'%s'", missing), collapse = ", "))
 }
 
 src <- "data-raw/logo-source.png"
 dst <- "man/figures/logo.png"
-
-# Brand-gold border colour, sampled from the swatch supplied by the user.
 border_color <- "#C09F56"
-# Stroke width in *source-pixel* units, before the final resize. The image
-# will be downsampled ~38% (~990 -> 600 wide) so a 12 px stroke ends up
-# rendering at roughly 7 px on the final logo.
-border_width <- 12
 
 if (!file.exists(src)) {
   stop("Missing source artwork: ", src)
 }
 
-# 1) Read + trim white background.
+dir.create(dirname(dst), recursive = TRUE, showWarnings = FALSE)
+
+# 1) Trim + pad to hex aspect + hex alpha mask via {magick}.
 img <- magick::image_read(src)
 img <- magick::image_trim(img, fuzz = 4)
 
-# 2) Pad to point-top hex aspect (W : H = 1 : 2/sqrt(3)) with white.
 info <- magick::image_info(img)
-w_src <- info$width
-h_target <- round(w_src * 2 / sqrt(3))
+w <- info$width
+h_target <- round(w * 2 / sqrt(3))
 if (info$height < h_target) {
   img <- magick::image_extent(
     img,
-    geometry = sprintf("%dx%d", w_src, h_target),
+    geometry = sprintf("%dx%d", w, h_target),
     gravity  = "center",
     color    = "white"
   )
 } else {
-  # Source already taller than hex aspect; crop sides to match.
   w_target <- round(info$height * sqrt(3) / 2)
   img <- magick::image_crop(
     img,
@@ -61,13 +69,9 @@ if (info$height < h_target) {
 info <- magick::image_info(img)
 w <- info$width
 h <- info$height
-
-# Point-top hex polygon vertices for a W x H bounding box.
 hex_x <- c(w / 2, w,     w,         w / 2, 0,         0)
 hex_y <- c(0,     h / 4, 3 * h / 4, h,     3 * h / 4, h / 4)
 
-# 3) Alpha mask: white-filled hex on transparent background, then
-#    composite via CopyOpacity to clip the corners.
 mask <- magick::image_blank(width = w, height = h, color = "transparent")
 mask <- magick::image_draw(mask, antialias = TRUE)
 graphics::polygon(hex_x, hex_y, col = "white", border = NA)
@@ -75,27 +79,32 @@ grDevices::dev.off()
 
 img <- magick::image_composite(img, mask, operator = "CopyOpacity")
 
-# 4) Gold hex border: stroke the same polygon, no fill, on a transparent
-#    layer, then composite over the masked artwork.
-border_layer <- magick::image_blank(width = w, height = h, color = "transparent")
-border_layer <- magick::image_draw(border_layer, antialias = TRUE)
-graphics::polygon(
-  hex_x, hex_y,
-  col    = NA,
-  border = border_color,
-  lwd    = border_width,
-  ljoin  = 1   # rounded corners on the stroke joins
+trimmed_png <- tempfile(fileext = ".png")
+magick::image_write(img, trimmed_png, format = "png")
+
+# 2) Use hexSticker::sticker() to draw the gold border around it.
+# hexSticker uses ggimage::geom_image(), whose `size` is npc-relative,
+# so we tune empirically to make the hex-masked artwork fill the rim.
+hexSticker::sticker(
+  subplot              = trimmed_png,
+  package              = "",
+  p_size               = 0,
+  s_x                  = 1,
+  s_y                  = 1,
+  s_width              = 0.85,
+  h_fill               = "white",
+  h_color              = border_color,
+  h_size               = 1.6,
+  white_around_sticker = FALSE,
+  filename             = dst,
+  dpi                  = 300
 )
-grDevices::dev.off()
 
-img <- magick::image_composite(img, border_layer, operator = "Over")
+# Up-sample to a 600 px wide PNG for retina-friendly README rendering.
+magick::image_read(dst) |>
+  magick::image_resize("600x") |>
+  magick::image_write(dst, format = "png", quality = 95)
 
-# 5) Resize and write.
-img <- magick::image_resize(img, "600x")
-
-dir.create(dirname(dst), recursive = TRUE, showWarnings = FALSE)
-magick::image_write(img, dst, format = "png", quality = 95)
-
-final <- magick::image_info(img)
+final <- magick::image_info(magick::image_read(dst))
 message("Wrote ", dst, " (", final$width, "x", final$height,
         ", border = ", border_color, ")")
