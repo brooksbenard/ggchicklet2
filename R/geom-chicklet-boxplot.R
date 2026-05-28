@@ -286,8 +286,20 @@ GeomChickletBoxplot <- ggplot2::ggproto( # nocov start
       stringsAsFactors = FALSE
     )
     median_df <- ggplot2::flip_data(median_df, flipped_aes)
-    median_grob <- ggplot2::GeomSegment$draw_panel(
+    median_seg <- ggplot2::GeomSegment$draw_panel(
       median_df, panel_params, coord, lineend = lineend
+    )
+
+    # Clip the median line to the rounded box shape. The median is drawn from
+    # data$xmin to data$xmax horizontally; at small radii that is identical to
+    # the box's straight edge, but as the corner radius grows toward
+    # min(width, height) / 2 the box body curves inward at the median's
+    # y-position and the unclipped segment pokes out past the curved sides
+    # (most visible when the box becomes a pill / oval). Wrapping the segment
+    # in a viewport whose `clip` is a same-shaped roundrectGrob makes grid
+    # cut the segment back to the actual rendered box outline.
+    median_grob <- median_with_chicklet_clip(
+      median_seg, box, panel_params, coord, radius = radius
     )
 
     ggname(
@@ -319,14 +331,12 @@ draw_chicklet_box <- function(data, panel_params, coord,
   coords <- coord$transform(data, panel_params)
 
   grobs <- lapply(seq_len(nrow(coords)), function(i) {
-    grid::roundrectGrob(
-      x             = coords$xmin[i],
-      y             = coords$ymax[i],
-      width         = coords$xmax[i] - coords$xmin[i],
-      height        = coords$ymax[i] - coords$ymin[i],
-      r             = radius,
-      default.units = "native",
-      just          = c("left", "top"),
+    chicklet_box_grob(
+      xmin   = coords$xmin[i],
+      xmax   = coords$xmax[i],
+      ymin   = coords$ymin[i],
+      ymax   = coords$ymax[i],
+      radius = radius,
       gp = grid::gpar(
         col      = coords$colour[i],
         fill     = ggplot2::fill_alpha(coords$fill[i], coords$alpha[i]),
@@ -339,4 +349,125 @@ draw_chicklet_box <- function(data, panel_params, coord,
   })
 
   do.call(grid::gList, grobs)
+}
+
+# Internal helper: cap `radius` (a grid unit, e.g. 3 pt) so that the
+# corner arcs of a roundrectGrob with the given native-coord bounds
+# never exceed half the box width or half the box height.
+#
+# `grid::roundrectGrob()` does not do this clamping itself: if `r` is
+# specified in physical units (pt, mm, ...) and converts to a native
+# value larger than `min(width, height) / 2`, the four corner arcs
+# overlap and the resulting *path* self-intersects (we end up with a
+# lens / vesica shape rather than a stadium). That breaks two things:
+#  - the visible box body no longer matches a rounded rectangle, and
+#  - any clipping path built from the same path geometry no longer
+#    matches the visible fill, so a median segment clipped against it
+#    can poke out past the curved sides.
+#
+# Must be called at draw time (inside `makeContent`) because the
+# pt <-> native conversion depends on the active viewport.
+cap_chicklet_radius <- function(xmin, xmax, ymin, ymax, radius) {
+  half_w_pt <- grid::convertWidth(
+    grid::unit(abs(xmax - xmin) / 2, "native"), "pt", valueOnly = TRUE
+  )
+  half_h_pt <- grid::convertHeight(
+    grid::unit(abs(ymax - ymin) / 2, "native"), "pt", valueOnly = TRUE
+  )
+  cap_pt <- min(half_w_pt, half_h_pt)
+  r_in_pt <- grid::convertUnit(radius, "pt", valueOnly = TRUE)
+  grid::unit(min(r_in_pt, cap_pt), "pt")
+}
+
+# Custom grob for the chicklet rounded box body. Defers radius capping
+# to draw time via makeContent so the box never collapses into a
+# self-intersecting lens at extreme radii.
+chicklet_box_grob <- function(xmin, xmax, ymin, ymax, radius,
+                              gp = grid::gpar(),
+                              name = "chicklet-box") {
+  grid::gTree(
+    xmin   = xmin,
+    xmax   = xmax,
+    ymin   = ymin,
+    ymax   = ymax,
+    radius = radius,
+    gp     = gp,
+    cl     = "chicklet_box",
+    name   = name
+  )
+}
+
+#' @exportS3Method grid::makeContent
+makeContent.chicklet_box <- function(x) {
+  effective_r <- cap_chicklet_radius(x$xmin, x$xmax, x$ymin, x$ymax, x$radius)
+  body <- grid::roundrectGrob(
+    x             = x$xmin,
+    y             = x$ymax,
+    width         = x$xmax - x$xmin,
+    height        = x$ymax - x$ymin,
+    r             = effective_r,
+    default.units = "native",
+    just          = c("left", "top"),
+    gp            = x$gp
+  )
+  grid::setChildren(x, grid::gList(body))
+}
+
+# Wrap the median segment grob in a viewport whose clipping path matches
+# the (capped) rounded box body. `box` is in data coords (already
+# flipped for the active orientation); we run it through
+# `coord$transform()` to get the same NPC space `GeomSegment$draw_panel`
+# produces.
+#
+# Uses viewport(clip = grob), which has been supported since R 4.1 on
+# devices that implement clipping paths (Cairo, AGG, Quartz, modern PDF).
+# On older devices the clip silently falls back to a rectangle, which
+# leaves the original (slightly-overshooting) behaviour -- so the median
+# never goes missing, it just clips less precisely.
+median_with_chicklet_clip <- function(median_grob, box, panel_params, coord,
+                                      radius = grid::unit(3, "pt")) {
+  box_npc <- coord$transform(box, panel_params)
+
+  chicklet_median_clip_grob(
+    median_grob,
+    xmin   = box_npc$xmin[1],
+    xmax   = box_npc$xmax[1],
+    ymin   = box_npc$ymin[1],
+    ymax   = box_npc$ymax[1],
+    radius = radius
+  )
+}
+
+chicklet_median_clip_grob <- function(median_grob, xmin, xmax, ymin, ymax,
+                                      radius,
+                                      name = "chicklet-clipped-median") {
+  grid::gTree(
+    median = median_grob,
+    xmin   = xmin,
+    xmax   = xmax,
+    ymin   = ymin,
+    ymax   = ymax,
+    radius = radius,
+    cl     = "chicklet_median_clip",
+    name   = name
+  )
+}
+
+#' @exportS3Method grid::makeContent
+makeContent.chicklet_median_clip <- function(x) {
+  effective_r <- cap_chicklet_radius(x$xmin, x$xmax, x$ymin, x$ymax, x$radius)
+  clip_path <- grid::roundrectGrob(
+    x             = x$xmin,
+    y             = x$ymax,
+    width         = x$xmax - x$xmin,
+    height        = x$ymax - x$ymin,
+    r             = effective_r,
+    default.units = "native",
+    just          = c("left", "top")
+  )
+  clipped <- grid::gTree(
+    children = grid::gList(x$median),
+    vp       = grid::viewport(clip = clip_path)
+  )
+  grid::setChildren(x, grid::gList(clipped))
 }

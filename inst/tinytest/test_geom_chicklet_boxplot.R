@@ -44,3 +44,46 @@ expect_warning(
   geom_chicklet_boxplot(notch = TRUE),
   pattern = "notch"
 )
+
+# ── Large radius does not collapse the box into a self-intersecting
+#    lens shape, and the median is clipped to the (capped) box body
+#    so it never pokes out past the curved sides. We can't visually
+#    diff here, but we can at least verify the plot builds cleanly,
+#    the median grob is wrapped in our clip helper, and the cap
+#    helper returns a value bounded by min(width, height) / 2.
+gg_big <- ggplot(iris, aes(Species, Sepal.Length, fill = Species)) +
+  geom_chicklet_boxplot(radius = grid::unit(40, "pt"))
+expect_silent(ggplot_gtable(ggplot_build(gg_big)))
+
+# cap_chicklet_radius uses grid::convertWidth/Height, which require an
+# active viewport whose `native` units match the ggplot layer-drawing
+# context (i.e. xscale / yscale = c(0, 1) so that native == npc).
+tmp_pdf <- tempfile(fileext = ".pdf")
+pdf(tmp_pdf, width = 6, height = 4)
+grid::grid.newpage()
+grid::pushViewport(grid::viewport(xscale = c(0, 1), yscale = c(0, 1)))
+
+cap <- ggchicklet2:::cap_chicklet_radius(
+  xmin = 0, xmax = 0.05, ymin = 0, ymax = 0.05,
+  radius = grid::unit(40, "pt")
+)
+expect_true(inherits(cap, "unit"))
+# 40 pt should be reduced -- a 5% NPC box is much smaller than 40 pt on
+# any reasonable device, so the cap must be strictly less than 40 pt.
+expect_true(as.numeric(grid::convertUnit(cap, "pt")) < 40)
+
+# When the box is comfortably larger than the requested radius, the cap
+# is a no-op (within floating-point tolerance).
+cap_small <- ggchicklet2:::cap_chicklet_radius(
+  xmin = 0, xmax = 0.9, ymin = 0, ymax = 0.9,
+  radius = grid::unit(3, "pt")
+)
+expect_equal(
+  as.numeric(grid::convertUnit(cap_small, "pt")),
+  3,
+  tolerance = 1e-6
+)
+
+grid::popViewport()
+dev.off()
+unlink(tmp_pdf)

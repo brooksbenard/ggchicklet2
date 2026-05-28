@@ -20,6 +20,14 @@
 * Pin `lineend` / `linejoin` to `"round"` in the rounded-box renderer
   so the four corners no longer show mitre-join spikes (regression
   introduced when forwarding `GeomBoxplot$draw_group()` defaults).
+* Cap the requested corner radius at `min(width, height) / 2` (in
+  native units, evaluated at draw time) inside the chicklet box and
+  median renderers. At extreme radii the corner arcs used to overlap,
+  producing a self-intersecting lens-shaped path and letting the
+  median line poke past the curved sides of the box. The box now
+  degrades cleanly to a stadium / oval shape and the median is
+  additionally clipped against the box body via a grid clipping path
+  so it never overshoots.
 * Bumped minimum `ggplot2` requirement to 3.5.0 (for the modern
   `*_gp` boxplot customization API and exported `flip_data()` /
   `fill_alpha()` helpers).
