@@ -1,18 +1,21 @@
 #!/usr/bin/env Rscript
 # Builds the ggchicklet2 hex logo using hexSticker::sticker().
 #
-# This is the snippet the maintainer settled on. Source artwork is
-# committed at data-raw/logo-source.png so the build is reproducible
-# from a clone of the repo. Output goes to man/figures/logo.png.
+# Source artwork is committed at data-raw/logo-source.png so the build
+# is reproducible from a clone of the repo. Output goes to
+# man/figures/logo.png.
 #
-# `s_width = s_height = 2.35` with `s_y = 0.95` is the framing the
-# maintainer settled on -- the artwork fills the hex without crossing
-# the gold rim. At that size the artwork's own white background does
-# fill the four canvas-corner triangles outside the rim though, so we
-# follow up with a {magick} flood-fill from each corner region to
-# clear the spillage back to transparent. The gold rim is a closed
-# boundary so the flood stops at the rim and the white inside the hex
-# is untouched.
+# The source artwork already carries the "ggchicklet2" wordmark, so we
+# pass package = "" and let hexSticker only draw the hex frame. The
+# artwork is a near-square, full-bleed illustration on a white
+# background whose content is bottom-heavy (the green bars / coop base
+# reach the lower edge). We size it as large as possible while keeping
+# every pixel inside the gold rim: nudging it up with `s_y = 1.15`
+# balances the top and bottom clearances, which lets `s_width =
+# s_height = 1.59` fit without any content crossing the boundary. The
+# artwork's white background matches the hex fill (`h_fill = "white"`),
+# so the two blend seamlessly and the canvas corners outside the hex
+# stay transparent.
 #
 # Reference: https://github.com/GuangchuangYu/hexSticker
 #
@@ -22,38 +25,14 @@ library(hexSticker)
 
 hex_logo <- magick::image_read("data-raw/logo-source.png")
 
+# hexSticker defaults to dpi = 300, which yields a 518x600 canvas --
+# small enough that the artwork looks pixelated when displayed. The
+# source art is ~1475 px wide, so we render at dpi = 900 (~1554 px
+# wide) to match the source resolution and keep the logo crisp. dpi
+# only changes the output resolution; the s_x / s_y / s_width framing
+# is in relative units and is unaffected.
 sticker(hex_logo, package = "",
-        s_x = 1, s_y = .95, s_width = 2.35, s_height = 2.35,
+        s_x = 0.96, s_y = 1.15, s_width = 1.5, s_height = 1.5,
         h_color = "#C09F56", h_fill = "white",
+        dpi = 900,
         filename = "man/figures/logo.png")
-
-local({
-  img <- magick::image_read("man/figures/logo.png")
-  info <- magick::image_info(img)
-  w <- info$width
-  h <- info$height
-
-  # Seeds sit safely inside each of the four canvas-corner triangles
-  # that fall outside the hex but inside the PNG bounding box. We use
-  # an offset of 50 px from each canvas corner — well inside the
-  # corner triangle for a 518x600 canvas.
-  inset <- 50L
-  seeds <- list(
-    c(inset,         inset),
-    c(w - 1 - inset, inset),
-    c(inset,         h - 1 - inset),
-    c(w - 1 - inset, h - 1 - inset)
-  )
-
-  for (s in seeds) {
-    img <- magick::image_fill(
-      img,
-      color    = "transparent",
-      point    = sprintf("+%d+%d", s[1], s[2]),
-      refcolor = "white",
-      fuzz     = 10
-    )
-  }
-
-  magick::image_write(img, "man/figures/logo.png", format = "png")
-})
